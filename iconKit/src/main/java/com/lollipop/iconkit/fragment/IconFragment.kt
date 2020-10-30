@@ -1,21 +1,19 @@
 package com.lollipop.iconkit.fragment
 
-import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.lollipop.iconcore.listener.WindowInsetsHelper
 import com.lollipop.iconcore.ui.IconHelper
+import com.lollipop.iconcore.ui.IconImageView
 import com.lollipop.iconcore.util.delay
+import com.lollipop.iconcore.util.doAsync
 import com.lollipop.iconkit.LIconKit
 import com.lollipop.iconkit.R
-import com.lollipop.iconcore.util.doAsync
-import com.lollipop.iconcore.util.onUI
 import com.lollipop.iconkit.dialog.PreviewIconDialog
 import kotlinx.android.synthetic.main.kit_fragment_icon.*
 
@@ -32,8 +30,10 @@ class IconFragment: BaseTabFragment() {
         get() = R.color.tabIconSelectedColor
     override val layoutId: Int
         get() = R.layout.kit_fragment_icon
+    override val isLightStatusBar: Boolean
+        get() = true
 
-    private val iconHelper = IconHelper.iconPackOnly {
+    private val iconHelper = IconHelper.iconPackOnly(true) {
         LIconKit.createAppsPageMap(it)
     }
 
@@ -75,6 +75,7 @@ class IconFragment: BaseTabFragment() {
         super.onDestroy()
         appListInsetsHelper = null
         previewIconDialog.onDestroy()
+        iconHelper.onDestroy()
     }
 
     private class IconAdapter(
@@ -109,7 +110,7 @@ class IconFragment: BaseTabFragment() {
             }
         }
 
-        private val iconView: ImageView = itemView.findViewById(R.id.iconView)
+        private val iconView: IconImageView = itemView.findViewById(R.id.iconView)
         private val nameView: TextView = itemView.findViewById(R.id.nameView)
 
         init {
@@ -119,7 +120,7 @@ class IconFragment: BaseTabFragment() {
         }
 
         fun bind(iconInfo: IconHelper.IconInfo) {
-            iconView.setImageResource(iconInfo.resId)
+            iconView.loadIcon(iconInfo.resId)
             nameView.text = iconInfo.name
         }
 
