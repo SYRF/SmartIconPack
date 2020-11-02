@@ -59,8 +59,12 @@ object LIconKit {
         return IconHelper.DefaultXmlMap.readFromAssets(context, fileName)
     }
 
-    fun readUpdateInfoByXml(context: Context, resId: Int): UpdateInfoManager.UpdateInfoProvider {
-        return UpdateInfoManager.DefXmlInfoProvider.readFromResource(context, resId)
+    fun readUpdateXmlFromResource(context: Context, resId: Int): UpdateInfoManager.UpdateInfoProvider {
+        return UpdateInfoManager.readXmlFromResource(context, resId)
+    }
+
+    fun readUpdateXmlFromAssets(context: Context, name: String): UpdateInfoManager.UpdateInfoProvider {
+        return UpdateInfoManager.readXmlFromAssets(context, name)
     }
 
     fun readUpdateInfoByJson(json: String): UpdateInfoManager.UpdateInfoProvider {
@@ -68,7 +72,11 @@ object LIconKit {
     }
 
     fun readLinkInfoByXml(context: Context, resId: Int): ExternalLinkManager.ExternalLinkProvider {
-        return ExternalLinkManager.DefXmlInfoProvider.readFromResource(context, resId)
+        return ExternalLinkManager.readFromResource(context, resId)
+    }
+
+    fun readLinkInfoByXmlFromAssets(context: Context, name: String): ExternalLinkManager.ExternalLinkProvider {
+        return ExternalLinkManager.readFromAssets(context, name)
     }
 
 }

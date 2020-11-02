@@ -40,11 +40,30 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
          */
         const val LINK_TYPE_UNKNOWN = -2
 
+        /**
+         * 网页外链的地址
+         */
         const val ARG_WEB_URL = "webUrl"
 
+        /**
+         * 链接标识
+         */
+        const val ARG_TAG = "linkTag"
+
+        /**
+         * 链接类型
+         */
         const val KEY_LINK_TYPE = "linkType"
 
-        val EMPTY_INFO = LinkInfo("", "", 0, Intent())
+        /**
+         * 空的外链
+         */
+        val EMPTY_INFO = LinkInfo("", "", 0, Intent(), "", "")
+
+        /**
+         * 已经解析的外链集合
+         */
+        private val externalLinkMap = HashMap<String, Array<LinkInfo>>()
 
         /**
          * 从意图中获取链接类型
@@ -58,6 +77,54 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
          */
         fun getWebUrl(intent: Intent): String {
             return intent.getStringExtra(ARG_WEB_URL)?:""
+        }
+
+        /**
+         * 获取原始的配置中的url信息
+         */
+        fun getLinkUrl(intent: Intent): String {
+            return intent.getStringExtra(ARG_TAG)?:""
+        }
+
+        /**
+         * 尝试寻找一个外部链接的集合
+         */
+        private fun optExternalLink(token: String): Array<LinkInfo>? {
+            val array = externalLinkMap[token]?:return null
+            return Array(array.size) { array[it] }
+        }
+
+        /**
+         * 放置一个外部链接的信息
+         */
+        private fun putExternalLink(token: String, links: List<LinkInfo>) {
+            externalLinkMap[token] = Array(links.size) { links[it] }
+        }
+
+        fun readFromAssets(context: Context, name: String): ExternalLinkProvider {
+            val token = getTokenByAssets(name)
+            val optExternalLink = optExternalLink(token)
+            if (optExternalLink != null && optExternalLink.isNotEmpty()) {
+                return SimpleInfoProvider(optExternalLink)
+            }
+            return DefXmlInfoProvider.readFromAssets(context, name)
+        }
+
+        fun readFromResource(context: Context, resId: Int): ExternalLinkProvider {
+            val token = getTokenByResource(resId)
+            val optExternalLink = optExternalLink(token)
+            if (optExternalLink != null && optExternalLink.isNotEmpty()) {
+                return SimpleInfoProvider(optExternalLink)
+            }
+            return DefXmlInfoProvider.readFromResource(context, resId)
+        }
+
+        private fun getTokenByResource(id: Int): String {
+            return "Resource$id"
+        }
+
+        private fun getTokenByAssets(name: String): String {
+            return "Assets$name"
         }
 
     }
@@ -104,6 +171,8 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
             const val ATTR_SUMMARY = "summary"
             const val ATTR_ICON = "icon"
             const val ATTR_URL = "url"
+            const val ATTR_OTHER1 = "attr1"
+            const val ATTR_OTHER2 = "attr2"
 
             const val TYPE_ACTION = "action"
             const val TYPE_HTTP = "http"
@@ -116,6 +185,7 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
             const val ARG_TYPE = "type"
 
             fun decodeUrl(intent: Intent, url: String) {
+                intent.putExtra(ARG_TAG, url)
                 when {
                     url.startsWith(TYPE_ACTION, true) -> {
                         val start = url.indexOf("(") + 1
@@ -135,6 +205,9 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
                     }
                     url == TYPE_STORE -> {
                         intent.putExtra(KEY_LINK_TYPE, LINK_TYPE_STORE)
+                    }
+                    else -> {
+                        intent.putExtra(KEY_LINK_TYPE, LINK_TYPE_UNKNOWN)
                     }
                 }
             }
@@ -188,22 +261,25 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
 
         </links>
      */
-    class DefXmlInfoProvider(xml: XmlPullParser, context: Context): BaseDefInfoProvider() {
+    class DefXmlInfoProvider(xml: XmlPullParser, context: Context, token: String): BaseDefInfoProvider() {
 
         companion object {
             fun readFromAssets(context: Context, name: String): DefXmlInfoProvider {
                 val newPullParser = Xml.newPullParser()
                 newPullParser.setInput(context.assets.open(name), "UTF-8")
-                return DefXmlInfoProvider(newPullParser, context)
+                return DefXmlInfoProvider(
+                    newPullParser, context, getTokenByAssets(name))
             }
 
             fun readFromResource(context: Context, resId: Int): DefXmlInfoProvider {
-                return DefXmlInfoProvider(context.resources.getXml(resId), context)
+                return DefXmlInfoProvider(
+                    context.resources.getXml(resId), context, getTokenByResource(resId))
             }
         }
 
         init {
             decodeFromXml(xml, context)
+            putExternalLink(token, linkList)
         }
 
         private fun decodeFromXml(xml: XmlPullParser, context: Context) {
@@ -213,10 +289,12 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
                 var title = ""
                 var summary = ""
                 var icon = 0
-                var url: Intent = Intent()
+                var url = Intent()
                 var itemInfo = false
                 var argType = ""
                 var argName = ""
+                var other1 = ""
+                var other2 = ""
                 while (eventType != XmlPullParser.END_DOCUMENT) {
                     val tagName = xml.name
                     when (eventType) {
@@ -224,6 +302,8 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
                             if (TAG_LINK == tagName) {
                                 title = xml.getAttributeValue(null, ATTR_TITLE)?:""
                                 summary = xml.getAttributeValue(null, ATTR_SUMMARY)?:""
+                                other1 = xml.getAttributeValue(null, ATTR_OTHER1)?:""
+                                other2 = xml.getAttributeValue(null, ATTR_OTHER2)?:""
                                 icon = context.findDrawableId(
                                     xml.getAttributeValue(null, ATTR_ICON))
                                 url = Intent()
@@ -246,7 +326,7 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
                         }
                         XmlPullParser.END_TAG -> {
                             if (TAG_LINK == tagName) {
-                                linkList.add(LinkInfo(title, summary, icon, url))
+                                linkList.add(LinkInfo(title, summary, icon, url, other1, other2))
                             } else if (TAG_ARG == tagName) {
                                 itemInfo = false
                             }
@@ -266,6 +346,41 @@ class ExternalLinkManager(private val linkProvider: ExternalLinkProvider?) {
 
     }
 
-    data class LinkInfo(val title: String, val summary: String, val icon: Int, val url: Intent)
+    private class SimpleInfoProvider(links: Array<LinkInfo>): BaseDefInfoProvider() {
+        init {
+            linkList.clear()
+            for (link in links) {
+                linkList.add(link)
+            }
+        }
+    }
+
+    data class LinkInfo(
+        /** 链接信息的标题 **/
+        val title: String,
+        /** 链接信息的描述内容 **/
+        val summary: String,
+        /** 链接信息的配置图标 **/
+        val icon: Int,
+        /**
+         *  链接信息的地址，它是一个组合的信息
+         *  可以通过{@link ExternalLinkManager#getLinkType}
+         *  获取链接信息的类型，包括：
+         *  {@link ExternalLinkManager#LINK_TYPE_STORE}
+         *  {@link ExternalLinkManager#LINK_TYPE_APP}
+         *  {@link ExternalLinkManager#LINK_TYPE_WEB}
+         *  {@link ExternalLinkManager#LINK_TYPE_UNKNOWN}
+         *  等返回值
+         *
+         *  可以通过{@link ExternalLinkManager#getWebUrl}获取网页跳转的链接
+         *  可以通过{@link ExternalLinkManager#getLinkUrl}获取链接信息中配置的原始信息
+         **/
+        val url: Intent,
+        /** 额外的配置参数1，它没有明确的意义，
+         * 仅仅作为扩展参数，在不同的地方有不同的意义 **/
+        val attr1: String,
+        /** 额外的配置参数2，它没有明确的意义，
+         * 仅仅作为扩展参数，在不同的地方有不同的意义 **/
+        val attr2: String)
 
 }

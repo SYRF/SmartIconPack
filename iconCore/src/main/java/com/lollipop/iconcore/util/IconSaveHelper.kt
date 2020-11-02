@@ -6,7 +6,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.PorterDuff
 import android.graphics.drawable.Drawable
-import android.util.ArraySet
 import androidx.core.content.ContextCompat
 import java.io.File
 import java.io.FileOutputStream
@@ -36,7 +35,8 @@ class IconSaveHelper (
      */
     fun add(context: Context, id: Int, name: String): IconSaveHelper {
         val drawable = ContextCompat.getDrawable(context, id)?:return this
-        return add(drawable, name)
+        iconList.addLast(Icon(drawable, name))
+        return this
     }
 
     /**
@@ -44,7 +44,8 @@ class IconSaveHelper (
      * 每个icon只能保存一次
      */
     fun add(drawable: Drawable, name: String): IconSaveHelper {
-        iconList.addLast(Icon(drawable, name))
+        val newDrawable = drawable.constantState?.newDrawable()?:drawable
+        iconList.addLast(Icon(newDrawable, name))
         return this
     }
 
